@@ -21,7 +21,7 @@ class DecimalEncoder(json.JSONEncoder):
             return str(o)
         return super(DecimalEncoder, self).default(o)
 
-class DYDX_trades_ws:
+class Connector:
     def __init__(self):
         self.fh = FeedHandler()
         self.markets_list = ['BTC-USD-PERP', 'ETH-USD-PERP']
@@ -113,5 +113,5 @@ class DYDX_trades_ws:
             return True
     
 if __name__ == '__main__':
-    feed = DYDX_trades_ws()
+    feed = Connector()
     feed.run()
