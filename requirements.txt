@@ -1,0 +1,2 @@
+cryptofeed==2.3.1
+redis
