@@ -2,11 +2,15 @@ from cryptofeed import FeedHandler
 from cryptofeed.defines import CANDLES, BID, ASK, BLOCKCHAIN, FUNDING, GEMINI, L2_BOOK, L3_BOOK, LIQUIDATIONS, OPEN_INTEREST, PERPETUAL, TICKER, TRADES, INDEX
 from cryptofeed.exchanges.dydx import dYdX
 
+from cryptofeed.exchanges import Binance, BinanceFutures
+
 from decimal import Decimal
 
 import redis
 
 import json
+
+from datetime import datetime
 
 # Connect to the Redis server
 redis_host = 'momentum_redis_container'  # Change this to the Redis server address if running on a different machine
@@ -24,24 +28,29 @@ class DecimalEncoder(json.JSONEncoder):
 class Connector:
     def __init__(self):
         self.fh = FeedHandler()
-        self.markets_list = ['BTC-USD-PERP', 'ETH-USD-PERP']
         self.max_length = 100000
+        self.markets = {
+            'dYdX': ['BTC-USD-PERP', 'ETH-USD-PERP'],
+            'binance': ['BTC-USDT', 'ETH-USDT'],
+            'binance-futures': ['BTC-USDT-PERP', 'ETH-USDT-PERP']
+        }
         
     def fix_market_names(self, market):
-        if market == 'BTC-USD-PERP':
+        if 'BTC' in market:
             return 'BTC-USD'
-        elif market == 'ETH-USD-PERP':
+        elif 'ETH' in market:
             return 'ETH-USD'
-        elif market == 'SOL-USD-PERP':
-            return 'SOL-USD'
         else:
             return market
-        
+    
     def run(self):
-        self.fh.add_feed(dYdX(symbols=self.markets_list, channels=[TRADES], callbacks={TRADES: self.trade}))
-        for market in self.markets_list:
-            self.fh.add_feed(dYdX(symbols=[market], channels=[L2_BOOK], callbacks={L2_BOOK: self.book}))
+        #self.fh.add_feed(Binance(symbols=self.markets['binance'], channels=[TRADES], callbacks={TRADES: self.trade}))
+        #self.fh.add_feed(Binance(symbols=self.markets['binance'], channels=[L2_BOOK], callbacks={L2_BOOK: self.book}))
+        self.fh.add_feed(BinanceFutures(symbols=self.markets['binance-futures'], channels=[TRADES], callbacks={TRADES: self.trade}))
+        self.fh.add_feed(BinanceFutures(symbols=self.markets['binance-futures'], channels=[L2_BOOK], callbacks={L2_BOOK: self.book}))
+        
         self.fh.run()
+    
         
     async def trade(self, t, receipt_timestamp):
         assert isinstance(t.timestamp, float)
@@ -69,6 +78,7 @@ class Connector:
         redis_client.rpush(lname, trade)
         if redis_client.llen(lname) > self.max_length:
             redis_client.ltrim(lname, -self.max_length, - 1)
+        
 
     async def book(self, book, receipt_timestamp):
         #print(f'Book received at {receipt_timestamp} for {book.exchange} - {book.symbol}, with {len(book.book)} entries. Top of book prices: {book.book.asks.index(0)[0]} - {book.book.bids.index(0)[0]}')
@@ -89,6 +99,8 @@ class Connector:
             'best_ask_size': best_ask_size
         }
         snap = json.dumps(snap, cls=DecimalEncoder)
+        #print(datetime.now(), 'snap', snap)
+        
         
         lname = 'ob_' + symbol
         # Push the list of dictionaries into the Redis list
@@ -96,9 +108,7 @@ class Connector:
         if redis_client.llen(lname) > self.max_length:
             redis_client.ltrim(lname, -self.max_length, - 1)
         
-        #print(datetime.now(), 'snap', snap)
         # Publish data to a channel named 'data_channel'
-        
         if self.check_book_overlapping(book):
             self.fix_book_overlapping(book)
 

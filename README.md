@@ -5,7 +5,7 @@ sudo docker build -t momentum_feed .
 
 2 run
 
-docker run -d --restart always --name momentum_feed_container --network momentum_network --log-opt mode=non-blocking --log-opt max-buffer-size=10m momentum_feed
+docker run -d --restart always --name momentum_feed_container --network momentum_network --log-opt mode=non-blocking --log-opt max-size=10m --log-opt max-file=3 momentum_feed
 
 3 stop
 
