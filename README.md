@@ -1,3 +1,4 @@
+A microservice recieves executed trades and orderbook updates from exchanges. Uses cryptofeed library. Saves data to local redis data storage.
 
 1 build
 
